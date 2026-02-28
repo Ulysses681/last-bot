@@ -11,7 +11,7 @@ token = os.getenv("TOKEN")
 if token is None:
     raise ValueError("TOKEN environment variable is missing!")
 
-client.run(token)
+
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -389,5 +389,6 @@ async def brainleaderboard(ctx):
     await ctx.send(embed=embed)
 
 
-bot.run(TOKEN)
+bot.run(token)
+
 
