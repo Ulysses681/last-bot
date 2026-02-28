@@ -5,7 +5,7 @@ import re
 OWNER_ID = 794425897561489440
 
 import os
-client.run(os.getenv("MTQ3NzE4NzI3MTI1NzA5NjMyNA.GYE75U.KNEMvaZEEhLKKYAQYAWDxcvAvWS3LVbxEiuLZs"))
+client.run(os.getenv("TOKEN"))
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -381,5 +381,6 @@ async def brainleaderboard(ctx):
     )
 
     await ctx.send(embed=embed)
+
 
 bot.run(TOKEN)
