@@ -1,3 +1,4 @@
+print("Script has started executing...")
 print("Bot file is running...")
 
 import os
@@ -164,3 +165,4 @@ async def leaderboard(ctx):
 
 # ================== START ==================
 bot.run(token)
+
