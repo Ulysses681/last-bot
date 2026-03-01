@@ -1,80 +1,32 @@
 print("Bot file is running...")
-import discord
-from discord.ext import commands
-import re
-OWNER_ID = 794425897561489440
 
 import os
+import discord
+import random
+import time
+import re
+from datetime import timedelta
+from collections import defaultdict
+from discord.ext import commands
 
+# ================== TOKEN ==================
 token = os.getenv("TOKEN")
 
-if token is None:
+if not token:
     raise ValueError("TOKEN environment variable is missing!")
 
-
-
+# ================== INTENTS ==================
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = False
-intents.presences = False
 intents.members = True
-
-braincoins = {}
-cooldowns = {}
-daily_claim = {}
 
 bot = commands.Bot(command_prefix="$", intents=intents, help_command=None)
 
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user}")
-@bot.command()
-async def hello(ctx):
-    await ctx.send("Hello! I'm working 😄")
-
-@bot.command()
-async def ping(ctx):
-    await ctx.send(f"Pong! {round(bot.latency * 1000)}ms")
-
-@bot.command()
-@commands.has_permissions(kick_members=True)
-async def kick(ctx, member: discord.Member):
-    await member.kick()
-    await ctx.send(f"{member} has been kicked.")
-
-@bot.command()
-@commands.has_permissions(ban_members=True)
-async def ban(ctx, member: discord.Member, *, reason="No reason provided"):
-    await member.ban(reason=reason)
-    await ctx.send(f"{member} has been banned.")
-
-@bot.command()
-@commands.has_permissions(ban_members=True)
-async def unban(ctx, user_id: int):
-    user = await bot.fetch_user(user_id)
-
-from datetime import timedelta
-
-@bot.command()
-@commands.has_permissions(moderate_members=True)
-async def timeout(ctx, member: discord.Member, minutes: int):
-    duration = timedelta(minutes=minutes)
-    await member.timeout(duration)
-    await ctx.send(f"{member} has been timed out for {minutes} minutes.")
-
-@bot.command()
-@commands.has_permissions(moderate_members=True)
-async def untimeout(ctx, member: discord.Member):
-    await member.timeout(None)
-    await ctx.send(f"{member} timeout removed.")
-
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def clear(ctx, amount: int):
-    await ctx.channel.purge(limit=amount + 1)
-    await ctx.send(f"Deleted {amount} messages.", delete_after=3)
-
-import re
+# ================== DATA STORAGE ==================
+braincoins = {}
+cooldowns = {}
+daily_claim = {}
+sniped_messages = defaultdict(list)
 
 bad_words = [
     "fuck", "fucking", "shit", "bitch", "asshole",
@@ -86,6 +38,17 @@ bad_words = [
 
 block_links = True
 block_invites = True
+
+shop_items = {
+    "shield": 200,
+    "boost": 500,
+    "vip": 1000
+}
+
+# ================== EVENTS ==================
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user}")
 
 @bot.event
 async def on_message(message):
@@ -103,112 +66,23 @@ async def on_message(message):
             )
             return
 
-    if block_invites:
-        if "discord.gg/" in content or "discord.com/invite/" in content:
-            await message.delete()
-            await message.channel.send(
-                f"{message.author.mention}, Discord invites are not allowed!",
-                delete_after=5
-            )
-            return
+    if block_invites and ("discord.gg/" in content or "discord.com/invite/" in content):
+        await message.delete()
+        await message.channel.send(
+            f"{message.author.mention}, Discord invites are not allowed!",
+            delete_after=5
+        )
+        return
 
-    if block_links:
-        url_pattern = r"(https?://\S+)"
-        if re.search(url_pattern, content):
-            await message.delete()
-            await message.channel.send(
-                f"{message.author.mention}, links are not allowed!",
-                delete_after=5
-            )
-            return
+    if block_links and re.search(r"(https?://\S+)", content):
+        await message.delete()
+        await message.channel.send(
+            f"{message.author.mention}, links are not allowed!",
+            delete_after=5
+        )
+        return
 
     await bot.process_commands(message)
-
-import random
-
-@bot.command()
-async def coinflip(ctx):
-    result = random.choice(["Heads", "Tails"])
-    await ctx.send(f"The coin landed on: {result}")
-
-@bot.command()
-async def serverinfo(ctx):
-    guild = ctx.guild
-
-    owner = guild.owner
-    if owner:
-        owner_text = f"{"Yoyo"} ({794425897561489440})"
-    else:
-        owner_text = "Owner not found"
-
-    embed = discord.Embed(
-        title="📊 Server Info",
-        color=discord.Color.green()
-    )
-
-    embed.add_field(name="Server Name", value=guild.name, inline=False)
-    embed.add_field(name="Members", value=guild.member_count, inline=False)
-    embed.add_field(name="Owner", value=owner_text, inline=False)
-
-    if guild.icon:
-        embed.set_thumbnail(url=guild.icon.url)
-
-    await ctx.send(embed=embed)
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def lock(ctx):
-    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
-    await ctx.send("Channel locked.")
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def unlock(ctx):
-    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
-    await ctx.send("Channel unlocked.")
-
-@bot.command()
-async def help(ctx):
-    embed = discord.Embed(
-        title="🤖 Bot Help Menu",
-        description="Here are all my commands:",
-        color=discord.Color.blue()
-    )
-
-    embed.add_field(
-        name="📌 Basic Commands",
-        value="""
-`$hello` - Says hello  
-`$ping` - Shows bot latency  
-`$coinflip` - Flip a coin  
-`$serverinfo` - Shows server info  
-""",
-        inline=False
-    )
-
-    embed.add_field(
-        name="🛡 Moderation Commands",
-        value="""
-`$kick @user` - Kick a member  
-`$ban @user` - Ban a member  
-`$unban username` - Unban a member  
-`$timeout @user minutes` - Timeout a member  
-`$untimeout @user` - Remove timeout  
-`$clear amount` - Delete messages  
-`$lock` - Lock channel  
-`$unlock` - Unlock channel  
-""",
-        inline=False
-    )
-
-    embed.set_footer(text="Prefix: $")
-
-    await ctx.send(embed=embed)
-
-from collections import defaultdict
-
-# Store up to 5 deleted messages per channel
-sniped_messages = defaultdict(list)
 
 @bot.event
 async def on_message_delete(message):
@@ -223,15 +97,103 @@ async def on_message_delete(message):
         "avatar": message.author.avatar.url if message.author.avatar else None
     })
 
-    # Keep only last 5 messages
     if len(sniped_messages[channel_id]) > 5:
         sniped_messages[channel_id].pop(0)
 
+# ================== BASIC COMMANDS ==================
+@bot.command()
+async def hello(ctx):
+    await ctx.send("Hello! I'm working 😄")
+
+@bot.command()
+async def ping(ctx):
+    await ctx.send(f"Pong! {round(bot.latency * 1000)}ms")
+
+@bot.command()
+async def coinflip(ctx):
+    await ctx.send(f"The coin landed on: {random.choice(['Heads', 'Tails'])}")
+
+@bot.command()
+async def poll(ctx, *, question):
+    embed = discord.Embed(title="📊 Poll", description=question, color=discord.Color.purple())
+    message = await ctx.send(embed=embed)
+    await message.add_reaction("👍")
+    await message.add_reaction("👎")
+
+# ================== SERVER INFO ==================
+@bot.command()
+async def serverinfo(ctx):
+    guild = ctx.guild
+    owner = guild.owner
+
+    owner_text = f"{owner} ({owner.id})" if owner else "Owner not found"
+
+    embed = discord.Embed(title="📊 Server Info", color=discord.Color.green())
+    embed.add_field(name="Server Name", value=guild.name, inline=False)
+    embed.add_field(name="Members", value=guild.member_count, inline=False)
+    embed.add_field(name="Owner", value=owner_text, inline=False)
+
+    if guild.icon:
+        embed.set_thumbnail(url=guild.icon.url)
+
+    await ctx.send(embed=embed)
+
+# ================== MODERATION ==================
+@bot.command()
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, member: discord.Member):
+    await member.kick()
+    await ctx.send(f"{member} has been kicked.")
+
+@bot.command()
+@commands.has_permissions(ban_members=True)
+async def ban(ctx, member: discord.Member, *, reason="No reason provided"):
+    await member.ban(reason=reason)
+    await ctx.send(f"{member} has been banned.")
+
+@bot.command()
+@commands.has_permissions(ban_members=True)
+async def unban(ctx, user_id: int):
+    user = await bot.fetch_user(user_id)
+    await ctx.guild.unban(user)
+    await ctx.send(f"{user} has been unbanned.")
+
+@bot.command()
+@commands.has_permissions(moderate_members=True)
+async def timeout(ctx, member: discord.Member, minutes: int):
+    await member.timeout(timedelta(minutes=minutes))
+    await ctx.send(f"{member} has been timed out for {minutes} minutes.")
+
+@bot.command()
+@commands.has_permissions(moderate_members=True)
+async def untimeout(ctx, member: discord.Member):
+    await member.timeout(None)
+    await ctx.send(f"{member} timeout removed.")
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def clear(ctx, amount: int):
+    await ctx.channel.purge(limit=amount + 1)
+    await ctx.send(f"Deleted {amount} messages.", delete_after=3)
+
+@bot.command()
+@commands.has_permissions(manage_channels=True)
+async def lock(ctx):
+    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
+    await ctx.send("Channel locked.")
+
+@bot.command()
+@commands.has_permissions(manage_channels=True)
+async def unlock(ctx):
+    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
+    await ctx.send("Channel unlocked.")
+
+# ================== SNIPE ==================
 @bot.command()
 async def snipe(ctx, index: int = 1):
     channel_id = ctx.channel.id
 
-    if channel_id not in sniped_messages or len(sniped_messages[channel_id]) == 0:
+    if not sniped_messages[channel_id]:
         await ctx.send("There's nothing to snipe.")
         return
 
@@ -241,52 +203,29 @@ async def snipe(ctx, index: int = 1):
 
     data = sniped_messages[channel_id][-index]
 
-    embed = discord.Embed(
-        description=data["content"],
-        color=discord.Color.red()
-    )
-
-    embed.set_author(
-        name=str(data["author"]),
-        icon_url=data["avatar"]
-    )
-
+    embed = discord.Embed(description=data["content"], color=discord.Color.red())
+    embed.set_author(name=str(data["author"]), icon_url=data["avatar"])
     embed.set_footer(text=f"Snipe #{index}")
 
     await ctx.send(embed=embed)
 
-@bot.command()
-async def poll(ctx, *, question):
-    embed = discord.Embed(title="📊 Poll", description=question, color=discord.Color.purple())
-    message = await ctx.send(embed=embed)
-    await message.add_reaction("👍")
-    await message.add_reaction("👎")
-
+# ================== ECONOMY ==================
 @bot.command()
 async def balance(ctx, member: discord.Member = None):
     member = member or ctx.author
     amount = braincoins.get(member.id, 0)
     await ctx.send(f"🧠 {member.mention} has **{amount} BrainCoins**")
 
-import random
-import time
-
 @bot.command()
 async def steal(ctx, member: discord.Member):
-    if member == ctx.author:
-        await ctx.send("You can't steal from yourself 💀")
+    if member == ctx.author or member.bot:
+        await ctx.send("Invalid target.")
         return
 
-    if member.bot:
-        await ctx.send("You can't steal from bots.")
-        return
-
-    # Cooldown (30 sec)
     now = time.time()
-    if ctx.author.id in cooldowns:
-        if now - cooldowns[ctx.author.id] < 30:
-            await ctx.send("⏳ Wait before stealing again.")
-            return
+    if ctx.author.id in cooldowns and now - cooldowns[ctx.author.id] < 30:
+        await ctx.send("⏳ Wait before stealing again.")
+        return
 
     cooldowns[ctx.author.id] = now
 
@@ -297,9 +236,7 @@ async def steal(ctx, member: discord.Member):
         await ctx.send("They have no BrainCoins to steal.")
         return
 
-    success = random.randint(1, 100)
-
-    if success <= 50:
+    if random.randint(1, 100) <= 50:
         stolen = random.randint(1, min(50, braincoins[member.id]))
         braincoins[member.id] -= stolen
         braincoins[ctx.author.id] += stolen
@@ -309,16 +246,13 @@ async def steal(ctx, member: discord.Member):
         braincoins[ctx.author.id] -= lost
         await ctx.send(f"💀 You got caught! You lost **{lost} BrainCoins**")
 
-daily_claim = {}
-
 @bot.command()
 async def daily(ctx):
     now = time.time()
 
-    if ctx.author.id in daily_claim:
-        if now - daily_claim[ctx.author.id] < 86400:
-            await ctx.send("⏳ You already claimed your daily BrainCoins.")
-            return
+    if ctx.author.id in daily_claim and now - daily_claim[ctx.author.id] < 86400:
+        await ctx.send("⏳ You already claimed your daily BrainCoins.")
+        return
 
     daily_claim[ctx.author.id] = now
     reward = random.randint(50, 150)
@@ -328,24 +262,10 @@ async def daily(ctx):
 
     await ctx.send(f"🎁 You received **{reward} BrainCoins**!")
 
-shop_items = {
-    "shield": 200,
-    "boost": 500,
-    "vip": 1000
-}
-
 @bot.command()
 async def shop(ctx):
-    text = ""
-    for item, price in shop_items.items():
-        text += f"{item} - {price} BrainCoins\n"
-
-    embed = discord.Embed(
-        title="🛒 Brainrot Shop",
-        description=text,
-        color=discord.Color.green()
-    )
-
+    text = "\n".join([f"{item} - {price} BrainCoins" for item, price in shop_items.items()])
+    embed = discord.Embed(title="🛒 Brainrot Shop", description=text, color=discord.Color.green())
     await ctx.send(embed=embed)
 
 @bot.command()
@@ -367,8 +287,6 @@ async def buy(ctx, item):
 
 @bot.command()
 async def brainleaderboard(ctx):
-    global braincoins
-    
     if not braincoins:
         await ctx.send("No one has BrainCoins yet.")
         return
@@ -380,15 +298,7 @@ async def brainleaderboard(ctx):
         user = await bot.fetch_user(user_id)
         text += f"{i}. {user.name} - {amount} BrainCoins\n"
 
-    embed = discord.Embed(
-        title="🏆 BrainCoin Leaderboard",
-        description=text,
-        color=discord.Color.gold()
-    )
-
+    embed = discord.Embed(title="🏆 BrainCoin Leaderboard", description=text, color=discord.Color.gold())
     await ctx.send(embed=embed)
 
-
-bot.run(token)
-
-
+# =======
